@@ -788,6 +788,20 @@ public class MainActivity extends Activity {
         }
 
         @JavascriptInterface
+        public void playVideo(String name) {
+            File file = gifStore == null ? null : gifStore.resolve(name);
+            if (file == null) {
+                toast("视频不存在或已被删除。");
+                return;
+            }
+            runOnUiThread(() -> {
+                Intent player = new Intent(MainActivity.this, VideoPlayerActivity.class);
+                player.putExtra("name", file.getName());
+                startActivity(player);
+            });
+        }
+
+        @JavascriptInterface
         public void shareMedia(String name) {
             File file = gifStore == null ? null : gifStore.resolve(name);
             if (file == null) {

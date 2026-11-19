@@ -838,6 +838,53 @@ body.android.has-cta .page { padding-bottom: 92px; }
   border-radius: 8px;
   background: #080a0b;
 }
+
+.preview-video-cover {
+  position: relative;
+  width: 100%;
+  min-height: 190px;
+  max-height: 56vh;
+  padding: 0;
+  overflow: hidden;
+  border-radius: 8px;
+  background: #080a0b;
+  display: grid;
+  place-items: center;
+}
+.preview-video-cover img {
+  display: block;
+  width: 100%;
+  max-height: 56vh;
+  object-fit: contain;
+}
+.preview-video-icon {
+  width: 70px;
+  height: 70px;
+  display: grid;
+  place-items: center;
+  border-radius: 18px;
+  background: rgba(255, 255, 255, 0.06);
+  color: var(--muted);
+}
+.preview-video-icon svg { width: 32px; height: 32px; }
+.preview-play-button {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  transform: translate(-50%, -50%);
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  height: 44px;
+  padding: 0 16px;
+  border-radius: 99px;
+  background: rgba(215, 255, 99, 0.92);
+  color: #0a0c0e;
+  font-size: 12px;
+  font-weight: 700;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.35);
+}
+.preview-play-button svg { width: 15px; height: 15px; }
 .gif-preview-info { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 12px 4px 0; }
 .gif-preview-info strong { font-size: 12px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .gif-preview-info span { font-family: var(--mono); font-size: 9px; color: var(--muted-2); white-space: nowrap; }

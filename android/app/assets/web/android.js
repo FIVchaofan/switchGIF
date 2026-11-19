@@ -537,6 +537,12 @@
     el.video.poster = "";
     el.video.muted = true;
     el.video.load();
+    el.video.addEventListener("loadeddata", () => {
+      if (!state.media || state.segmentPreview) return;
+      el.video.play().catch(() => {
+        // Autoplay may be blocked; the user can still press the preview button.
+      });
+    }, { once: true });
     el.trimFilm.style.backgroundImage = "none";
 
     setNativeBusy(false);
@@ -1640,13 +1646,27 @@
     state.previewTarget = item;
     el.previewStage.replaceChildren();
     if (item.type === "video") {
-      const video = document.createElement("video");
-      video.controls = true;
-      video.autoplay = true;
-      video.loop = true;
-      video.playsInline = true;
-      video.src = mediaUrl(item);
-      el.previewStage.appendChild(video);
+      const cover = document.createElement("button");
+      cover.type = "button";
+      cover.className = "preview-video-cover";
+      cover.setAttribute("aria-label", `播放 ${item.name}`);
+      if (item.thumbnail) {
+        const image = document.createElement("img");
+        image.src = thumbnailUrl(item);
+        image.alt = item.name;
+        cover.appendChild(image);
+      } else {
+        const icon = document.createElement("span");
+        icon.className = "preview-video-icon";
+        icon.innerHTML = `<svg aria-hidden="true"><use href="#i-video"></use></svg>`;
+        cover.appendChild(icon);
+      }
+      const play = document.createElement("span");
+      play.className = "preview-play-button";
+      play.innerHTML = `<svg aria-hidden="true"><use href="#i-play"></use></svg><span>播放视频</span>`;
+      cover.appendChild(play);
+      cover.addEventListener("click", () => BRIDGE.playVideo(item.name));
+      el.previewStage.appendChild(cover);
     } else {
       const image = document.createElement("img");
       image.src = mediaUrl(item);

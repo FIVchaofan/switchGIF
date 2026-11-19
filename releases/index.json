@@ -1,7 +1,7 @@
 {
   "app": "原速 GIF",
   "package": "com.yuansu.gif",
-  "current": "1.3.2",
+  "current": "1.3.3",
   "releases": [
     {
       "versionCode": 1,
@@ -56,6 +56,15 @@
       "sha256": "F3306003F917205424945E99F0B74DF0DBF41F12C35C3049D16656CDD69CA195",
       "size": 10364262,
       "notes": "视频/图片改用系统照片选择器，按格式筛选"
+    },
+    {
+      "versionCode": 7,
+      "versionName": "1.3.3",
+      "date": "2026-11-19",
+      "path": "v1.3.3/YuansuGIF-v1.3.3.apk",
+      "sha256": "5D431E3685E0EB8650710CEAC3167A9EA5B126BB38FEDC2D1C27584EFFAE1693",
+      "size": 10364262,
+      "notes": "作品库视频改用原生播放器；本地源视频自动播放，修复加载转圈"
     }
   ]
 }
