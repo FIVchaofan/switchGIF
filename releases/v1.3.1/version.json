@@ -1,0 +1,11 @@
+{
+  "versionCode": 5,
+  "versionName": "1.3.1",
+  "file": "YuansuGIF-v1.3.1.apk",
+  "sha256": "BDD37CAEF151C52B7812DABD4E47B8727086225F6B3983306D45653611110D91",
+  "size": 10364333,
+  "minSdk": 29,
+  "targetSdk": 34,
+  "builtAt": "2026-11-19",
+  "notes": "私密多媒体库；图片/视频导入；搜索；文件夹；视频预览；大小预估修正；修复视频卡片点击预览"
+}

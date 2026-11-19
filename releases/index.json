@@ -1,0 +1,61 @@
+{
+  "app": "原速 GIF",
+  "package": "com.yuansu.gif",
+  "current": "1.3.2",
+  "releases": [
+    {
+      "versionCode": 1,
+      "versionName": "1.0.0",
+      "date": "2026-11-17",
+      "path": "v1.0.0/YuansuGIF-v1.0.0.apk",
+      "sha256": "28F07003140A89B6E87F5E0F16CE48492C564A15209961A6B8F4FFED586DD29B",
+      "size": 10335590,
+      "notes": "首个版本；保存到相册；无网络权限"
+    },
+    {
+      "versionCode": 2,
+      "versionName": "1.1.0",
+      "date": "2026-11-18",
+      "path": "v1.1.0/YuansuGIF-v1.1.0.apk",
+      "sha256": "E935629FA3BFEC00E5D3C9E33B3781F713FFA5C618B9D9694D5A8E6ED4772E15",
+      "size": 10347878,
+      "notes": "私密作品库；自动保存；预览/重命名/分享/删除"
+    },
+    {
+      "versionCode": 3,
+      "versionName": "1.2.0",
+      "date": "2026-11-18",
+      "path": "v1.2.0/YuansuGIF-v1.2.0.apk",
+      "sha256": "1E8EA093FE18DDB1F632D1B07BBF4DA9E56BBC397B19E0293A67358D609274EE",
+      "size": 10351974,
+      "notes": "保存到手机；导入 GIF；0.5×–2.0× 变速；默认原速"
+    },
+    {
+      "versionCode": 4,
+      "versionName": "1.3.0",
+      "date": "2026-11-19",
+      "path": "v1.3.0/YuansuGIF-v1.3.0.apk",
+      "sha256": "BD23CF5746D87C3664E1A4D3EDEE6722CDE51AF58E6B5B6DEEC26ABD32BDBA00",
+      "size": 10364333,
+      "notes": "私密多媒体库；图片/视频导入；搜索；文件夹；视频预览；大小预估修正"
+    },
+    {
+      "versionCode": 5,
+      "versionName": "1.3.1",
+      "date": "2026-11-19",
+      "path": "v1.3.1/YuansuGIF-v1.3.1.apk",
+      "sha256": "BDD37CAEF151C52B7812DABD4E47B8727086225F6B3983306D45653611110D91",
+      "size": 10364333,
+      "notes": "修复视频卡片缩略图点击不能打开预览"
+    },
+    {
+      "versionCode": 6,
+      "versionName": "1.3.2",
+      "date": "2026-11-19",
+      "path": "v1.3.2/YuansuGIF-v1.3.2.apk",
+      "sha256": "F3306003F917205424945E99F0B74DF0DBF41F12C35C3049D16656CDD69CA195",
+      "size": 10364262,
+      "notes": "视频/图片改用系统照片选择器，按格式筛选"
+    }
+  ]
+}

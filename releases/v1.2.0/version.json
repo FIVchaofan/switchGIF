@@ -1,0 +1,11 @@
+{
+  "versionCode": 3,
+  "versionName": "1.2.0",
+  "file": "YuansuGIF-v1.2.0.apk",
+  "sha256": "1E8EA093FE18DDB1F632D1B07BBF4DA9E56BBC397B19E0293A67358D609274EE",
+  "size": 10351974,
+  "minSdk": 29,
+  "targetSdk": 34,
+  "builtAt": "2026-11-18",
+  "notes": "保存到手机；导入 GIF；0.5×–2.0× 变速；默认原速"
+}
