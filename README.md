@@ -4,7 +4,7 @@
 
 v1.3 起，作品库不再只管理 GIF：**GIF、图片、视频**都可以导入同一个私密多媒体库，支持按名称搜索、文件夹、重命名、移动、分享和删除。默认情况下，相册和图库看不到这些文件；只有主动分享，或点「保存到手机」明确导出时，文件才会以原格式离开应用。
 
-**安装包：[原速GIF.apk](原速GIF.apk)**（v1.3.4，约 15.5 MB，Android 10+）
+**安装包：[原速GIF.apk](原速GIF.apk)**（v1.3.5，约 15.5 MB，Android 10+）
 
 ![首页](docs/android-home.png)
 
@@ -38,6 +38,7 @@ APK **没有申请 INTERNET、相册读取或存储权限**，页面、FFmpeg WA
 | v1.3.2 | [YuansuGIF-v1.3.2.apk](releases/v1.3.2/YuansuGIF-v1.3.2.apk) | 视频/图片改用系统照片选择器，按格式筛选 |
 | v1.3.3 | [YuansuGIF-v1.3.3.apk](releases/v1.3.3/YuansuGIF-v1.3.3.apk) | 视频改用原生播放器；本地视频自动播放，去掉转圈 |
 | v1.3.4 | [YuansuGIF-v1.3.4.apk](releases/v1.3.4/YuansuGIF-v1.3.4.apk) | 内置开源 IjkPlayer，不调用系统播放器 |
+| v1.3.5 | [YuansuGIF-v1.3.5.apk](releases/v1.3.5/YuansuGIF-v1.3.5.apk) | 修复播放器画面畸变，按原始比例居中 |
 
 每个版本目录都有 `version.json`、`SHA256.txt` 和 `RELEASE_NOTES.md`。
 
@@ -77,6 +78,7 @@ APK **没有申请 INTERNET、相册读取或存储权限**，页面、FFmpeg WA
 
 - 编辑页本地源视频：加载完成后静音自动播放，避免一直停在加载转圈；可点「试看所选片段」重新播放选中范围。
 - 作品库视频：预览页显示首帧封面和「播放视频」按钮，点击后打开**应用内置的开源 IjkPlayer**，控制条由应用自己绘制，不启动系统播放器、不跳出应用。
+- 播放器按视频原始宽高比计算 TextureView 布局尺寸并居中显示，不会再把横屏/竖屏视频拉伸变形。
 - 作品库视频不再依赖 WebView 的自定义 HTTPS Range，因此大文件（几十 MB）不会再出现无法播放/一直转圈。
 
 | 输出设置 | 结果 |
@@ -231,6 +233,7 @@ releases/                     所有历史版本（不要覆盖）
   v1.3.2/
   v1.3.3/
   v1.3.4/
+  v1.3.5/
   RELEASES.md                 版本表与回退说明
 android/
   app/
@@ -276,6 +279,7 @@ docs/                         截图与图标
 - 「导入」改为照片选择器：图片/GIF 和视频分开选择，分别按 `image/*`、`video/*` 过滤；不再打开文件管理器。
 - 转 GIF 选择视频同样走照片选择器，只显示视频；Android 14 上确认打开 `PhotoPickerActivity`。
 - 应用没有 `INTERNET` / 相册读取 / 存储权限，仍可完整离线转换、导入、预览和分享。
-- APK 为 v1.3.4（versionCode 8），可直接覆盖安装 v1.3.3。
+- APK 为 v1.3.5（versionCode 9），可直接覆盖安装 v1.3.4。
+
 
 

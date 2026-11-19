@@ -31,6 +31,7 @@ import tv.danmaku.ijk.media.player.IjkMediaPlayer;
 public class VideoPlayerActivity extends Activity implements TextureView.SurfaceTextureListener {
     private IjkMediaPlayer player;
     private TextureView textureView;
+    private FrameLayout rootView;
     private Surface surface;
     private SeekBar seekBar;
     private TextView playButton;
@@ -40,6 +41,8 @@ public class VideoPlayerActivity extends Activity implements TextureView.Surface
     private boolean prepared;
     private boolean tracking;
     private long durationMs;
+    private int videoWidth;
+    private int videoHeight;
     private String videoName;
 
     private final Runnable tick = new Runnable() {
@@ -105,12 +108,15 @@ public class VideoPlayerActivity extends Activity implements TextureView.Surface
     }
 
     private void buildViews(String title) {
-        FrameLayout root = new FrameLayout(this);
-        root.setBackgroundColor(Color.BLACK);
+        rootView = new FrameLayout(this);
+        rootView.setBackgroundColor(Color.BLACK);
+        rootView.addOnLayoutChangeListener((v, left, top, right, bottom,
+                                             oldLeft, oldTop, oldRight, oldBottom) ->
+                fitTextureToVideo());
 
         textureView = new TextureView(this);
         textureView.setSurfaceTextureListener(this);
-        root.addView(textureView, new FrameLayout.LayoutParams(
+        rootView.addView(textureView, new FrameLayout.LayoutParams(
                 FrameLayout.LayoutParams.MATCH_PARENT, FrameLayout.LayoutParams.MATCH_PARENT));
 
         LinearLayout top = new LinearLayout(this);
@@ -139,7 +145,7 @@ public class VideoPlayerActivity extends Activity implements TextureView.Surface
         FrameLayout.LayoutParams topParams = new FrameLayout.LayoutParams(
                 FrameLayout.LayoutParams.MATCH_PARENT, FrameLayout.LayoutParams.WRAP_CONTENT);
         topParams.gravity = Gravity.TOP;
-        root.addView(top, topParams);
+        rootView.addView(top, topParams);
 
         LinearLayout bottom = new LinearLayout(this);
         bottom.setGravity(Gravity.CENTER_VERTICAL);
@@ -191,9 +197,9 @@ public class VideoPlayerActivity extends Activity implements TextureView.Surface
         FrameLayout.LayoutParams bottomParams = new FrameLayout.LayoutParams(
                 FrameLayout.LayoutParams.MATCH_PARENT, FrameLayout.LayoutParams.WRAP_CONTENT);
         bottomParams.gravity = Gravity.BOTTOM;
-        root.addView(bottom, bottomParams);
+        rootView.addView(bottom, bottomParams);
 
-        setContentView(root);
+        setContentView(rootView);
     }
 
     private void togglePlay() {
@@ -220,19 +226,28 @@ public class VideoPlayerActivity extends Activity implements TextureView.Surface
     }
 
     private void applyAspect(int width, int height) {
-        if (width <= 0 || height <= 0 || textureView == null) return;
-        textureView.post(() -> {
-            float viewWidth = textureView.getWidth();
-            float viewHeight = textureView.getHeight();
-            if (viewWidth <= 0 || viewHeight <= 0) return;
-            float scale = Math.min(viewWidth / width, viewHeight / height);
-            float dx = (viewWidth - width * scale) / 2f;
-            float dy = (viewHeight - height * scale) / 2f;
-            Matrix matrix = new Matrix();
-            matrix.setScale(scale, scale);
-            matrix.postTranslate(dx, dy);
-            textureView.setTransform(matrix);
-        });
+        if (width <= 0 || height <= 0) return;
+        videoWidth = width;
+        videoHeight = height;
+        fitTextureToVideo();
+    }
+
+    private void fitTextureToVideo() {
+        if (videoWidth <= 0 || videoHeight <= 0 || textureView == null || rootView == null) return;
+        int rootWidth = rootView.getWidth();
+        int rootHeight = rootView.getHeight();
+        if (rootWidth <= 0 || rootHeight <= 0) return;
+        float scale = Math.min(rootWidth / (float) videoWidth, rootHeight / (float) videoHeight);
+        int width = Math.max(1, Math.round(videoWidth * scale));
+        int height = Math.max(1, Math.round(videoHeight * scale));
+        FrameLayout.LayoutParams params = new FrameLayout.LayoutParams(width, height);
+        params.gravity = Gravity.CENTER;
+        if (textureView.getLayoutParams() == null
+                || textureView.getLayoutParams().width != width
+                || textureView.getLayoutParams().height != height) {
+            textureView.setLayoutParams(params);
+        }
+        textureView.setTransform(new Matrix());
     }
 
     private static String format(long ms) {
@@ -295,3 +310,4 @@ public class VideoPlayerActivity extends Activity implements TextureView.Surface
         super.onDestroy();
     }
 }
+
