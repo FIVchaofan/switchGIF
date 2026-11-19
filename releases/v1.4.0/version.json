@@ -1,0 +1,11 @@
+{
+  "versionCode": 10,
+  "versionName": "1.4.0",
+  "file": "YuansuGIF-v1.4.0.apk",
+  "sha256": "2A1F5A937FD65824CB37A8721FAD5F4941AB4D0E9D8904716A2D4DD4C5D9C927",
+  "size": 16279549,
+  "minSdk": 29,
+  "targetSdk": 34,
+  "builtAt": "2026-11-19",
+  "notes": "新增 1MB 限制压缩、批量导入；修复照片选择器视频转换权限"
+}

@@ -45,7 +45,9 @@ import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.nio.charset.StandardCharsets;
+import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.concurrent.ExecutorService;
@@ -90,7 +92,7 @@ public class MainActivity extends Activity {
         settings.setDomStorageEnabled(true);
         settings.setDatabaseEnabled(true);
         settings.setMediaPlaybackRequiresUserGesture(false);
-        settings.setAllowFileAccess(false);
+        settings.setAllowFileAccess(true);
         settings.setAllowContentAccess(true);
         settings.setSupportZoom(false);
         settings.setBuiltInZoomControls(false);
@@ -172,55 +174,142 @@ public class MainActivity extends Activity {
     @Override
     protected void onActivityResult(int requestCode, int resultCode, Intent data) {
         if (requestCode == REQUEST_PICK_VIDEO) {
-            Uri[] result = null;
-            if (resultCode == RESULT_OK && data != null) {
-                Uri uri = data.getData();
-                if (uri != null) {
-                    try {
-                        getContentResolver().takePersistableUriPermission(
-                                uri, Intent.FLAG_GRANT_READ_URI_PERMISSION);
-                    } catch (SecurityException ignored) {
-                        // The temporary grant is still enough for this session.
-                    }
-                    result = new Uri[]{uri};
-                }
-            }
-            if (filePathCallback != null) {
-                filePathCallback.onReceiveValue(result);
-                filePathCallback = null;
-            }
+            Uri uri = resultCode == RESULT_OK && data != null ? data.getData() : null;
+            deliverPickedVideo(uri);
             return;
         }
         if (requestCode == REQUEST_IMPORT_IMAGE || requestCode == REQUEST_IMPORT_VIDEO) {
-            if (resultCode == RESULT_OK && data != null && data.getData() != null) {
-                importMedia(data.getData());
+            List<Uri> uris = collectImportUris(data);
+            if (resultCode == RESULT_OK && !uris.isEmpty()) {
+                importMedia(uris);
             } else {
-                importCallback(false, "已取消导入", null);
+                importCallback(false, "已取消导入", new JSONArray());
             }
             return;
         }
         super.onActivityResult(requestCode, resultCode, data);
     }
 
-    private void importMedia(Uri uri) {
-        try {
-            getContentResolver().takePersistableUriPermission(
-                    uri, Intent.FLAG_GRANT_READ_URI_PERMISSION);
-        } catch (SecurityException ignored) {
-            // Copying starts immediately, so the temporary grant is enough.
+    /**
+     * The Photo Picker grants the activity a temporary content URI, but the
+     * WebView renderer is a different process and cannot read it reliably.
+     * Copy the chosen video into the app cache and hand WebView a local file URI.
+     */
+    private void deliverPickedVideo(Uri uri) {
+        final ValueCallback<Uri[]> callback = filePathCallback;
+        filePathCallback = null;
+        if (callback == null) return;
+        if (uri == null) {
+            callback.onReceiveValue(null);
+            return;
         }
         final String displayName = queryDisplayName(uri);
         io.execute(() -> {
+            File target = null;
             try {
-                String name = gifStore.importFrom(this, uri, displayName);
-                importCallback(true, "已导入作品库", name);
+                String name = displayName == null ? "video.mp4" : displayName;
+                String extension = "mp4";
+                int dot = name.lastIndexOf('.');
+                if (dot >= 0 && dot < name.length() - 1) {
+                    extension = name.substring(dot + 1).replaceAll("[^A-Za-z0-9]", "");
+                    if (extension.isEmpty()) extension = "mp4";
+                }
+                target = new File(getCacheDir(), "picked-videos/" + safeCacheName(name, extension));
+                File parent = target.getParentFile();
+                if (parent != null) {
+                    if (parent.exists()) {
+                        File[] old = parent.listFiles();
+                        if (old != null) {
+                            for (File file : old) file.delete();
+                        }
+                    }
+                    if (!parent.isDirectory()) parent.mkdirs();
+                }
+                try (InputStream input = getContentResolver().openInputStream(uri);
+                     FileOutputStream output = new FileOutputStream(target)) {
+                    if (input == null) throw new IOException("无法读取视频");
+                    byte[] buffer = new byte[64 * 1024];
+                    int read;
+                    while ((read = input.read(buffer)) != -1) {
+                        output.write(buffer, 0, read);
+                    }
+                }
+                final Uri local = Uri.fromFile(target);
+                mainHandler.post(() -> callback.onReceiveValue(new Uri[]{local}));
             } catch (Exception error) {
-                importCallback(false, error.getMessage() == null ? "导入失败" : error.getMessage(), null);
+                if (target != null) target.delete();
+                mainHandler.post(() -> {
+                    callback.onReceiveValue(null);
+                    Toast.makeText(MainActivity.this, "无法读取所选视频，请重试。", Toast.LENGTH_LONG).show();
+                });
             }
         });
     }
 
-    private boolean launchMediaPicker(int requestCode, String mime, String[] mimeTypes, boolean video) {
+    private String safeCacheName(String name, String fallbackExtension) {
+        String safe = name == null ? "" : new File(name).getName();
+        safe = safe.replaceAll("[\\\\/:*?\"<>|\\r\\n\\t]", "_").trim();
+        if (safe.isEmpty()) safe = "video." + fallbackExtension;
+        if (safe.length() > 80) {
+            int dot = safe.lastIndexOf('.');
+            String extension = dot >= 0 ? safe.substring(dot) : "." + fallbackExtension;
+            safe = safe.substring(0, Math.max(1, 80 - extension.length())) + extension;
+        }
+        return safe;
+    }
+
+    private List<Uri> collectImportUris(Intent data) {
+        List<Uri> uris = new ArrayList<>();
+        if (data == null) return uris;
+        ClipData clip = data.getClipData();
+        if (clip != null) {
+            for (int index = 0; index < clip.getItemCount(); index++) {
+                Uri uri = clip.getItemAt(index).getUri();
+                if (uri != null && !uris.contains(uri)) uris.add(uri);
+            }
+        }
+        Uri single = data.getData();
+        if (single != null && !uris.contains(single)) uris.add(single);
+        return uris;
+    }
+
+    private void importMedia(List<Uri> uris) {
+        io.execute(() -> {
+            JSONArray names = new JSONArray();
+            int success = 0;
+            int failed = 0;
+            String lastError = null;
+            for (Uri uri : uris) {
+                try {
+                    try {
+                        getContentResolver().takePersistableUriPermission(
+                                uri, Intent.FLAG_GRANT_READ_URI_PERMISSION);
+                    } catch (SecurityException ignored) {
+                        // Copying starts immediately, so the temporary grant is enough.
+                    }
+                    String displayName = queryDisplayName(uri);
+                    String name = gifStore.importFrom(this, uri, displayName);
+                    names.put(name);
+                    success += 1;
+                } catch (Exception error) {
+                    failed += 1;
+                    lastError = error.getMessage();
+                }
+            }
+            String message;
+            if (success > 0) {
+                message = failed > 0
+                        ? "已导入 " + success + " 个，失败 " + failed + " 个"
+                        : "已导入 " + success + " 个作品";
+            } else {
+                message = lastError == null ? "导入失败" : lastError;
+            }
+            importCallback(success > 0, message, names);
+        });
+    }
+
+    private boolean launchMediaPicker(int requestCode, String mime, String[] mimeTypes,
+                                      boolean video, boolean multiple) {
         Uri collection = video
                 ? MediaStore.Video.Media.EXTERNAL_CONTENT_URI
                 : MediaStore.Images.Media.EXTERNAL_CONTENT_URI;
@@ -228,12 +317,17 @@ public class MainActivity extends Activity {
             Intent picker = new Intent(MediaStore.ACTION_PICK_IMAGES);
             picker.setType(mime);
             picker.putExtra(Intent.EXTRA_MIME_TYPES, mimeTypes);
+            if (multiple) {
+                int max = Math.min(20, MediaStore.getPickImagesMaxLimit());
+                picker.putExtra(MediaStore.EXTRA_PICK_IMAGES_MAX, Math.max(2, max));
+            }
             picker.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION);
             if (startPicker(picker, requestCode)) return true;
         }
         Intent gallery = new Intent(Intent.ACTION_PICK);
         gallery.setDataAndType(collection, mime);
         gallery.putExtra(Intent.EXTRA_MIME_TYPES, mimeTypes);
+        gallery.putExtra(Intent.EXTRA_ALLOW_MULTIPLE, multiple);
         gallery.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION);
         return startPicker(gallery, requestCode);
     }
@@ -261,10 +355,10 @@ public class MainActivity extends Activity {
         return "导入的GIF.gif";
     }
 
-    private void importCallback(boolean ok, String message, String name) {
-        String nameLiteral = name == null ? "null" : JSONObject.quote(name);
+    private void importCallback(boolean ok, String message, JSONArray names) {
+        String namesLiteral = names == null ? "[]" : names.toString();
         String script = "window.onMediaImported(" + ok + ","
-                + JSONObject.quote(message) + "," + nameLiteral + ")";
+                + JSONObject.quote(message) + "," + namesLiteral + ")";
         mainHandler.post(() -> {
             if (webView != null) webView.evaluateJavascript(script, null);
         });
@@ -346,7 +440,7 @@ public class MainActivity extends Activity {
             }
             filePathCallback = callback;
             boolean launched = launchMediaPicker(
-                    REQUEST_PICK_VIDEO, "video/*", VIDEO_MIME_TYPES, true);
+                    REQUEST_PICK_VIDEO, "video/*", VIDEO_MIME_TYPES, true, false);
             if (!launched) {
                 filePathCallback = null;
                 callback.onReceiveValue(null);
@@ -746,8 +840,8 @@ public class MainActivity extends Activity {
         @JavascriptInterface
         public void pickImagesToImport() {
             runOnUiThread(() -> {
-                if (!launchMediaPicker(REQUEST_IMPORT_IMAGE, "image/*", IMAGE_MIME_TYPES, false)) {
-                    importCallback(false, "没有找到可用的照片选择器", null);
+                if (!launchMediaPicker(REQUEST_IMPORT_IMAGE, "image/*", IMAGE_MIME_TYPES, false, true)) {
+                    importCallback(false, "没有找到可用的照片选择器", new JSONArray());
                 }
             });
         }
@@ -755,8 +849,8 @@ public class MainActivity extends Activity {
         @JavascriptInterface
         public void pickVideosToImport() {
             runOnUiThread(() -> {
-                if (!launchMediaPicker(REQUEST_IMPORT_VIDEO, "video/*", VIDEO_MIME_TYPES, true)) {
-                    importCallback(false, "没有找到可用的照片选择器", null);
+                if (!launchMediaPicker(REQUEST_IMPORT_VIDEO, "video/*", VIDEO_MIME_TYPES, true, true)) {
+                    importCallback(false, "没有找到可用的照片选择器", new JSONArray());
                 }
             });
         }
@@ -862,3 +956,5 @@ public class MainActivity extends Activity {
         }
     }
 }
+
+

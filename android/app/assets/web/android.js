@@ -19,6 +19,7 @@
     width: 640,
     colors: 256,
     loop: true,
+    limitSize: false,
     speed: 1.0,
     busy: false,
     converting: false,
@@ -89,6 +90,7 @@
     fpsHint: $("fps-hint"),
     sourceSizeHint: $("source-size-hint"),
     loopToggle: $("loop-toggle"),
+    limitToggle: $("limit-toggle"),
     summaryDuration: $("summary-duration"),
     summarySize: $("summary-size"),
     summaryEstimate: $("summary-estimate"),
@@ -517,6 +519,7 @@
     state.fps = 20;
     state.colors = 256;
     state.loop = true;
+    state.limitSize = false;
     state.speed = 1.0;
     state.segmentPreview = false;
 
@@ -605,6 +608,7 @@
     state.width = 640;
     state.colors = 256;
     state.loop = true;
+    state.limitSize = false;
     state.speed = 1.0;
     syncSettingsControls();
   }
@@ -769,6 +773,8 @@
     try { el.video.playbackRate = state.speed; } catch { /* no-op */ }
     el.loopToggle.classList.toggle("is-on", state.loop);
     el.loopToggle.setAttribute("aria-checked", String(state.loop));
+    el.limitToggle.classList.toggle("is-on", state.limitSize);
+    el.limitToggle.setAttribute("aria-checked", String(state.limitSize));
     const hints = { 10: "轻量", 15: "均衡", 20: "均衡 · 推荐", 25: "最顺滑" };
     el.fpsHint.textContent = state.media && effectiveFps() !== state.fps
       ? `源片约 ${effectiveFps()}fps`
@@ -798,10 +804,12 @@
     const speedRatio = state.speed >= 1
       ? 0.68
       : 0.52 + ((state.speed - 0.5) / 0.5) * 0.16;
-    el.summaryEstimate.textContent = fmtEstimateRange(pixels * 0.16 * colorFactor * speedRatio);
+    el.summaryEstimate.textContent = state.limitSize
+      ? "限制 ≤ 1 MB"
+      : fmtEstimateRange(pixels * 0.16 * colorFactor * speedRatio);
     el.fpsHint.textContent = fps !== state.fps ? `源片约 ${fps}fps` : el.fpsHint.textContent;
     el.ctaDuration.textContent = `${outDuration.toFixed(2)}s`;
-    el.ctaDetail.textContent = `${width} × ${height} · ${fps}fps · ${speedText}×`;
+    el.ctaDetail.textContent = `${width} × ${height} · ${fps}fps · ${speedText}×${state.limitSize ? " · ≤1MB" : ""}`;
   }
 
   // ------------------------------------------------------------------
@@ -932,61 +940,92 @@
       updateProgressUi(4, "正在分析画面色彩…");
       el.progressPercent.textContent = "…";
       el.progressBar.classList.add("is-pending");
-      const paletteArgs = [
-        "-hide_banner", "-loglevel", "error",
-        "-ss", start.toFixed(3), "-t", duration.toFixed(3), "-i", inputName,
-        "-an", "-vf",
-        `${speedFilter}fps=${fps},scale=${width}:-1:flags=lanczos,palettegen=max_colors=${colors}:stats_mode=diff`,
-        "-frames:v", "1", "-y", "palette.png",
-      ];
-      let code = await ffmpeg.exec(paletteArgs, -1);
-      if (code !== 0 && code !== undefined) throw new Error("色彩分析失败，请换一个视频试试。");
-      if (token !== state.token || state.cancelled) return;
 
-      state.currentPass = 2;
-      updateProgressUi(44, "正在生成 GIF…");
-      const gifArgs = [
-        "-hide_banner", "-loglevel", "error",
-        "-ss", start.toFixed(3), "-t", duration.toFixed(3), "-i", inputName,
-        "-i", "palette.png", "-an",
-        "-lavfi", `${speedFilter}fps=${fps},scale=${width}:-1:flags=lanczos[x];[x][1:v]paletteuse=dither=sierra2_4a:diff_mode=rectangle`,
-        "-loop", loop ? "0" : "-1",
-        "-y", "out.gif",
-      ];
-      code = await ffmpeg.exec(gifArgs, -1);
-      if (code !== 0 && code !== undefined) throw new Error("GIF 编码失败，请减少片段长度后重试。");
-      if (token !== state.token || state.cancelled) return;
+      const targetBytes = 1024 * 1024;
+      const maxAttempts = state.limitSize ? 5 : 1;
+      let plan = { width, fps, colors };
+      let output = null;
+      let parsed = null;
+      let usedPlan = plan;
+
+      for (let attempt = 0; attempt < maxAttempts; attempt++) {
+        usedPlan = plan;
+        if (attempt > 0) {
+          state.currentPass = 1;
+          updateProgressUi(4 + attempt * 3, `第 ${attempt + 1} 次压缩：正在降低画质…`);
+          el.progressBar.classList.add("is-pending");
+        }
+        const paletteArgs = [
+          "-hide_banner", "-loglevel", "error",
+          "-ss", start.toFixed(3), "-t", duration.toFixed(3), "-i", inputName,
+          "-an", "-vf",
+          `${speedFilter}fps=${plan.fps},scale=${plan.width}:-1:flags=lanczos,palettegen=max_colors=${plan.colors}:stats_mode=diff`,
+          "-frames:v", "1", "-y", "palette.png",
+        ];
+        let code = await ffmpeg.exec(paletteArgs, -1);
+        if (code !== 0 && code !== undefined) throw new Error("色彩分析失败，请换一个视频试试。");
+        if (token !== state.token || state.cancelled) return;
+
+        state.currentPass = 2;
+        updateProgressUi(44, state.limitSize ? "正在压缩到 1MB 内…" : "正在生成 GIF…");
+        const gifArgs = [
+          "-hide_banner", "-loglevel", "error",
+          "-ss", start.toFixed(3), "-t", duration.toFixed(3), "-i", inputName,
+          "-i", "palette.png", "-an",
+          "-lavfi", `${speedFilter}fps=${plan.fps},scale=${plan.width}:-1:flags=lanczos[x];[x][1:v]paletteuse=dither=sierra2_4a:diff_mode=rectangle`,
+          "-loop", loop ? "0" : "-1",
+          "-y", "out.gif",
+        ];
+        code = await ffmpeg.exec(gifArgs, -1);
+        if (code !== 0 && code !== undefined) throw new Error("GIF 编码失败，请减少片段长度后重试。");
+        if (token !== state.token || state.cancelled) return;
+
+        const data = await ffmpeg.readFile("out.gif");
+        output = new Uint8Array(data);
+        if (!output.length) throw new Error("没有生成有效的 GIF。");
+        parsed = parseGif(output) || {};
+        if (!state.limitSize || output.length <= targetBytes) break;
+        if (attempt === maxAttempts - 1) {
+          throw new Error("无法在 1MB 内保留完整时长，请缩短片段后重试。");
+        }
+        updateProgressUi(44, `当前 ${fmtBytes(output.length)}，继续压缩…`);
+        plan = {
+          width: Math.max(120, Math.round(plan.width * 0.68)),
+          fps: Math.max(6, Math.round(plan.fps * 0.72)),
+          colors: Math.max(32, Math.round(plan.colors / 2)),
+        };
+      }
+      if (!output) throw new Error("没有生成有效的 GIF。");
+      if (state.limitSize && output.length > targetBytes) {
+        throw new Error("无法在 1MB 内保留完整时长，请缩短片段后重试。");
+      }
 
       updateProgressUi(99, "正在收尾…");
-      const data = await ffmpeg.readFile("out.gif");
-      const output = new Uint8Array(data);
-      if (!output.length) throw new Error("没有生成有效的 GIF。");
-      if (token !== state.token || state.cancelled) return;
-
-      const parsed = parseGif(output) || {};
       const gifDuration = parsed.duration || expectedDuration;
       const delta = gifDuration - expectedDuration;
-      const tolerance = Math.max(0.13, 1.05 / Math.max(fps, 1));
+      const tolerance = Math.max(0.13, 1.05 / Math.max(usedPlan.fps, 1));
       const blob = new Blob([output], { type: "image/gif" });
       if (state.resultUrl) URL.revokeObjectURL(state.resultUrl);
       state.resultUrl = URL.createObjectURL(blob);
       state.resultBytes = output;
       const suffix = speed === 1 ? "原速" : `${formatSpeed(speed)}x`;
+      const limitSuffix = state.limitSize ? "_1MB" : "";
       state.result = {
         url: state.resultUrl,
-        filename: `${(state.media.filename.replace(/\.[^.]+$/, "") || "clip").slice(0, 60)}_${suffix}.gif`,
+        filename: `${(state.media.filename.replace(/\.[^.]+$/, "") || "clip").slice(0, 60)}_${suffix}${limitSuffix}.gif`,
         duration: Number(gifDuration.toFixed(3)),
         source_duration: Number(duration.toFixed(3)),
         expected_duration: Number(expectedDuration.toFixed(3)),
         delta_ms: Math.round(delta * 1000),
         timing_ok: Math.abs(delta) <= tolerance,
         speed,
-        fps,
-        width: parsed.width || width,
-        height: parsed.height || Math.round(width * (state.media.height / state.media.width)),
+        fps: usedPlan.fps,
+        width: parsed.width || usedPlan.width,
+        height: parsed.height || Math.round(usedPlan.width * (state.media.height / state.media.width)),
         size: output.length,
-        colors,
+        colors: usedPlan.colors,
         loop,
+        limitApplied: state.limitSize,
       };
       finishConversion(state.result);
       await cleanupFfmpeg(ffmpeg, [inputName, "palette.png", "out.gif"]);
@@ -1258,16 +1297,19 @@
     }
   }
 
-  window.onMediaImported = (ok, message, name) => {
+  window.onMediaImported = (ok, message, imported) => {
     state.importing = false;
     el.libraryImport.disabled = false;
     el.libraryImportLabel.textContent = "导入";
+    const names = Array.isArray(imported) ? imported : (imported ? [imported] : []);
     if (ok) {
-      if (state.libraryFolder && name) {
-        try {
-          BRIDGE.moveToFolder(name, state.libraryFolder);
-        } catch {
-          // Keep the imported file at the root if the folder move fails.
+      if (state.libraryFolder && names.length) {
+        for (const name of names) {
+          try {
+            BRIDGE.moveToFolder(name, state.libraryFolder);
+          } catch {
+            // Keep the imported file at the root if the folder move fails.
+          }
         }
       }
       if (state.libraryOpen) loadLibrary();
@@ -1842,9 +1884,11 @@
     el.resultLoopLabel.textContent = result.loop
       ? `${speedText}× ${speed === 1 ? "原速" : "变速"}循环`
       : `${speedText}× ${speed === 1 ? "原速" : "变速"} · 播放一次`;
-    el.resultLede.textContent = speed === 1
-      ? "节奏和时长都没变，正在保存到作品库。"
-      : `已按 ${speedText}× ${speed > 1 ? "加快" : "放慢"}生成，正在保存到作品库。`;
+    el.resultLede.textContent = result.limitApplied
+      ? "已在 1MB 内压缩完成，正在保存到作品库。"
+      : (speed === 1
+        ? "节奏和时长都没变，正在保存到作品库。"
+        : `已按 ${speedText}× ${speed > 1 ? "加快" : "放慢"}生成，正在保存到作品库。`);
     el.resultDuration.textContent = `${Number(result.duration).toFixed(2)}s`;
     el.resultResolution.textContent = `${result.width} × ${result.height}`;
     el.resultFps.textContent = `${result.fps}fps`;
@@ -1995,6 +2039,11 @@
     el.loopToggle.addEventListener("click", () => {
       state.loop = !state.loop;
       syncSettingsControls();
+    });
+    el.limitToggle.addEventListener("click", () => {
+      state.limitSize = !state.limitSize;
+      syncSettingsControls();
+      updateSummary();
     });
     el.convertButton.addEventListener("click", startConversion);
     el.ctaConvert.addEventListener("click", startConversion);
@@ -2230,5 +2279,6 @@
 
   init();
 })();
+
 
 
