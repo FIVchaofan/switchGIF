@@ -1,0 +1,11 @@
+{
+  "versionCode": 8,
+  "versionName": "1.3.4",
+  "file": "YuansuGIF-v1.3.4.apk",
+  "sha256": "6DB2C573F82110B6D7EE467D98F5D9745D109ADF8B62B27215291A1A7C46D83A",
+  "size": 16279549,
+  "minSdk": 29,
+  "targetSdk": 34,
+  "builtAt": "2026-11-19",
+  "notes": "内置开源 IjkPlayer 播放视频，不调用系统播放器；修复大视频转圈"
+}

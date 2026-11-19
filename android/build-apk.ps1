@@ -38,16 +38,18 @@ if ($LASTEXITCODE -ne 0) { throw "aapt2 link failed" }
 
 Write-Host "[3/6] javac"
 $javaFiles = @(Get-ChildItem -Path "$build\gen", "$app\src" -Recurse -Filter *.java | ForEach-Object { $_.FullName })
-& "$jdk\bin\javac.exe" -encoding UTF-8 -source 11 -target 11 -classpath $platform -d "$build\classes" @javaFiles
+$ijkJar = Join-Path $app "libs\ijkplayer.jar"
+if (-not (Test-Path $ijkJar)) { throw "Missing IjkPlayer jar: $ijkJar" }
+& "$jdk\bin\javac.exe" -encoding UTF-8 -source 11 -target 11 -classpath "$platform;$ijkJar" -d "$build\classes" @javaFiles
 if ($LASTEXITCODE -ne 0) { throw "javac failed" }
 
 Write-Host "[4/6] d8"
 $classFiles = @(Get-ChildItem -Path "$build\classes" -Recurse -Filter *.class | ForEach-Object { $_.FullName })
-& "$buildTools\d8.bat" --lib $platform --min-api 29 --output "$build\dex" @classFiles
+& "$buildTools\d8.bat" --lib $platform --min-api 29 --output "$build\dex" @classFiles $ijkJar
 if ($LASTEXITCODE -ne 0) { throw "d8 failed" }
 
 Write-Host "[5/6] package / zipalign"
-python (Join-Path $project "add_dex.py") "$build\base.apk" "$build\dex\classes.dex" "$build\unsigned.apk"
+python (Join-Path $project "add_dex.py") "$build\base.apk" "$build\dex\classes.dex" "$build\unsigned.apk" "$app\jniLibs"
 if ($LASTEXITCODE -ne 0) { throw "add classes.dex failed" }
 & $zipalign -f -p 4 "$build\unsigned.apk" "$build\aligned.apk"
 if ($LASTEXITCODE -ne 0) { throw "zipalign failed" }
